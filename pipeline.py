@@ -201,9 +201,11 @@ class PipelinePeyre:
 
         boites = resultats["boxes"].detach().cpu().tolist()
         scores = resultats["scores"].detach().cpu().tolist()
-        etiquettes_brutes = resultats.get("labels")
-        if etiquettes_brutes is None:
-            etiquettes_brutes = resultats.get("text_labels", [])
+        # Selon la version de transformers, `labels` peut contenir des ids
+        # tandis que `text_labels` contient les textes de détection.
+        etiquettes_brutes = resultats.get("text_labels")
+        if etiquettes_brutes is None or len(etiquettes_brutes) == 0:
+            etiquettes_brutes = resultats.get("labels", [])
         etiquettes = [str(e) for e in etiquettes_brutes]
 
         regions: list[DetectionRegion] = []
