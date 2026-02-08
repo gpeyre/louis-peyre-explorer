@@ -157,6 +157,14 @@ Puis relancez:
 python pipeline.py --max_images 5
 ```
 
+Cas Google Colab:
+- Si vous voyez des conflits `numpy` pendant `pip install -r requirements.txt`, c'est normal: ce fichier est orienté environnement local.
+- Sur Colab, utilisez `requirements-colab.txt` (prévu pour `numpy>=2`):
+
+```bash
+!pip install -q -r requirements-colab.txt
+```
+
 ## 10. Exécution sur Google Colab
 
 1. Ouvrir un notebook Colab.
@@ -173,7 +181,7 @@ drive.mount('/content/drive')
 !git clone https://github.com/gpeyre/louis-peyre-explorer.git
 %cd /content/louis-peyre-explorer
 !pip install -q --upgrade pip
-!pip install -q -r requirements.txt
+!pip install -q -r requirements-colab.txt
 ```
 
 ```bash
