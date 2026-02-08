@@ -1,6 +1,6 @@
 # Louis Peyre Explorer
 
-Pipeline SOTA de vision par ordinateur pour analyser automatiquement des tableaux numérisés, détecter des sujets en **open vocabulary**, segmenter précisément les régions, produire des crops normalisés `128x128`, et générer un fichier de provenance.
+Pipeline de vision par ordinateur haute performance pour analyser automatiquement des tableaux numérisés, détecter des sujets en **open vocabulary**, segmenter précisément les régions, produire des crops normalisés `128x128`, et générer un fichier de provenance.
 
 ## 1. Installation
 
@@ -118,8 +118,11 @@ python pipeline.py \
   --drive_folder louis-peyre-images \
   --box_threshold 0.22 \
   --text_threshold 0.20 \
+  --nms_iou 0.45 \
   --clip_threshold 0.20 \
   --crop_size 128 \
+  --crop_padding 0.10 \
+  --face_crop_padding 0.28 \
   --clip_batch_size 8 \
   --grounding_model_id IDEA-Research/grounding-dino-base \
   --sam_model_id facebook/sam-vit-huge \
@@ -169,7 +172,7 @@ Cas Google Colab:
 
 ```bash
 !pip uninstall -y torch torchvision torchaudio transformers accelerate || true
-!pip install -q --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0
+!pip install -q --no-cache-dir --force-reinstall --index-url https://download.pytorch.org/whl/cu124 torch==2.6.0+cu124 torchvision==0.21.0+cu124 torchaudio==2.6.0+cu124
 !pip install -q --no-cache-dir -r requirements-colab.txt
 ```
 
@@ -191,7 +194,7 @@ drive.mount('/content/drive')
 %cd /content/louis-peyre-explorer
 !pip install -q --upgrade pip
 !pip uninstall -y torch torchvision torchaudio transformers accelerate || true
-!pip install -q --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0
+!pip install -q --no-cache-dir --force-reinstall --index-url https://download.pytorch.org/whl/cu124 torch==2.6.0+cu124 torchvision==0.21.0+cu124 torchaudio==2.6.0+cu124
 !pip install -q --no-cache-dir -r requirements-colab.txt
 ```
 

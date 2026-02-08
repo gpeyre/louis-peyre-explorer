@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pipeline SOTA de vision par ordinateur pour analyser des tableaux numérisés.
+"""Pipeline haute performance de vision par ordinateur pour analyser des tableaux numérisés.
 
 Étapes:
 1. Détection open-vocabulary avec Grounding DINO.
@@ -55,68 +55,112 @@ CAPTION_OPEN_VOCAB = (
     "decorative elements, symbols"
 )
 
+CAPTIONS_DINO = [
+    (
+        CAPTION_OPEN_VOCAB,
+        1.0,
+        1.0,
+    ),
+    (
+        "face. head. portrait. eye. nose. mouth. ear. hair. human face.",
+        0.70,
+        0.70,
+    ),
+    (
+        "person. child. hand. arm. leg. foot. body. silhouette. figure.",
+        0.80,
+        0.80,
+    ),
+]
+
+FACE_HINTS = {
+    "face",
+    "head",
+    "portrait",
+    "eye",
+    "nose",
+    "mouth",
+    "ear",
+    "hair",
+}
+
 VOCABULAIRE_BASE = [
-    "personne",
-    "visage",
-    "main",
-    "bras",
-    "jambe",
-    "pied",
+    "person",
+    "face",
+    "head",
+    "eye",
+    "nose",
+    "mouth",
+    "ear",
+    "hand",
+    "arm",
+    "leg",
+    "foot",
     "animal",
-    "oiseau",
-    "cheval",
-    "chien",
-    "chat",
-    "poisson",
-    "arbre",
-    "plante",
-    "fleur",
-    "feuille",
-    "fenetre",
-    "porte",
-    "mur",
-    "colonne",
-    "toit",
+    "bird",
+    "horse",
+    "dog",
+    "cat",
+    "fish",
+    "tree",
+    "plant",
+    "flower",
+    "leaf",
+    "window",
+    "door",
+    "wall",
+    "column",
+    "roof",
     "table",
-    "chaise",
-    "lit",
-    "livre",
+    "chair",
+    "bed",
+    "book",
     "instrument",
-    "violon",
-    "guitare",
-    "objet",
+    "violin",
+    "guitar",
+    "object",
     "vase",
-    "drape",
-    "vetement",
-    "bijou",
-    "ciel",
-    "nuage",
-    "eau",
-    "rivage",
-    "batiment",
-    "maison",
-    "tour",
-    "route",
-    "pont",
-    "barque",
-    "lampe",
-    "miroir",
-    "rideau",
-    "ornement",
-    "symbole",
-    "couronne",
-    "arme",
-    "bouclier",
-    "poterie",
+    "fabric",
+    "clothing",
+    "jewel",
+    "sky",
+    "cloud",
+    "water",
+    "shore",
+    "building",
+    "house",
+    "tower",
+    "road",
+    "bridge",
+    "boat",
+    "lamp",
+    "mirror",
+    "curtain",
+    "ornament",
+    "symbol",
+    "crown",
+    "weapon",
+    "shield",
+    "pottery",
     "fruit",
-    "bol",
-    "verre",
-    "montagne",
-    "colline",
-    "rocher",
-    "sol",
-    "ombre",
-    "lumiere",
+    "bowl",
+    "glass",
+    "mountain",
+    "hill",
+    "rock",
+    "ground",
+    "shadow",
+    "light",
+    "portrait",
+    "silhouette",
+    "scene",
+    "abstract",
+]
+
+CLIP_TEMPLATES = [
+    "a painting of {}",
+    "an artwork showing {}",
+    "a classical painting with {}",
 ]
 
 
@@ -147,6 +191,9 @@ class PipelinePeyre:
         modele_dino_id: str,
         modele_sam_id: str,
         modele_clip_id: str,
+        iou_nms: float,
+        padding_ratio: float,
+        face_padding_ratio: float,
     ) -> None:
         self.appareil = appareil
         self.seuil_boite = seuil_boite
@@ -154,6 +201,9 @@ class PipelinePeyre:
         self.seuil_clip_min = seuil_clip_min
         self.taille_crop = taille_crop
         self.lot_clip = lot_clip
+        self.iou_nms = iou_nms
+        self.padding_ratio = padding_ratio
+        self.face_padding_ratio = face_padding_ratio
 
         logging.info("Chargement Grounding DINO: %s", modele_dino_id)
         self.proc_dino = AutoProcessor.from_pretrained(modele_dino_id)
@@ -172,10 +222,14 @@ class PipelinePeyre:
         self.modele_clip = CLIPModel.from_pretrained(modele_clip_id).to(self.appareil)
         self.modele_clip.eval()
 
-    def detecter_regions(self, image: Image.Image) -> list[DetectionRegion]:
-        entrees = self.proc_dino(images=image, text=CAPTION_OPEN_VOCAB, return_tensors="pt").to(
-            self.appareil
-        )
+    def _detecter_avec_caption(
+        self,
+        image: Image.Image,
+        caption: str,
+        seuil_boite: float,
+        seuil_texte: float,
+    ) -> list[DetectionRegion]:
+        entrees = self.proc_dino(images=image, text=caption, return_tensors="pt").to(self.appareil)
         with torch.no_grad():
             sorties = self.modele_dino(**entrees)
 
@@ -186,16 +240,16 @@ class PipelinePeyre:
             resultats = self.proc_dino.post_process_grounded_object_detection(
                 sorties,
                 entrees.input_ids,
-                box_threshold=self.seuil_boite,
-                text_threshold=self.seuil_texte,
+                box_threshold=seuil_boite,
+                text_threshold=seuil_texte,
                 target_sizes=[image.size[::-1]],
             )[0]
         except TypeError:
             resultats = self.proc_dino.post_process_grounded_object_detection(
                 sorties,
                 entrees.input_ids,
-                threshold=self.seuil_boite,
-                text_threshold=self.seuil_texte,
+                threshold=seuil_boite,
+                text_threshold=seuil_texte,
                 target_sizes=[image.size[::-1]],
             )[0]
 
@@ -206,18 +260,37 @@ class PipelinePeyre:
         etiquettes_brutes = resultats.get("text_labels")
         if etiquettes_brutes is None or len(etiquettes_brutes) == 0:
             etiquettes_brutes = resultats.get("labels", [])
-        etiquettes = [str(e) for e in etiquettes_brutes]
+        etiquettes = [str(e).strip() for e in etiquettes_brutes]
 
         regions: list[DetectionRegion] = []
-        for boite, score, etiquette in zip(boites, scores, etiquettes):
+        for idx, boite in enumerate(boites):
+            score = float(scores[idx]) if idx < len(scores) else 0.0
+            etiquette = etiquettes[idx] if idx < len(etiquettes) else ""
+            if not etiquette:
+                etiquette = caption
             regions.append(
                 DetectionRegion(
                     boite=[float(v) for v in boite],
-                    score_detection=float(score),
-                    etiquette_dino=etiquette.strip(),
+                    score_detection=score,
+                    etiquette_dino=etiquette,
                 )
             )
         return regions
+
+    def detecter_regions(self, image: Image.Image) -> list[DetectionRegion]:
+        regions: list[DetectionRegion] = []
+        for caption, facteur_boite, facteur_texte in CAPTIONS_DINO:
+            seuil_boite = max(0.05, self.seuil_boite * facteur_boite)
+            seuil_texte = max(0.05, self.seuil_texte * facteur_texte)
+            regions.extend(
+                self._detecter_avec_caption(
+                    image=image,
+                    caption=caption,
+                    seuil_boite=seuil_boite,
+                    seuil_texte=seuil_texte,
+                )
+            )
+        return fusionner_regions_nms(regions, iou_thresh=self.iou_nms)
 
     def segmenter_boites(self, image: Image.Image, regions: Sequence[DetectionRegion]) -> list[list[int]]:
         if not regions:
@@ -268,15 +341,18 @@ class PipelinePeyre:
             return []
 
         vocabulaire = self.generer_vocabulaire_dynamique(etiquettes_dino)
-        textes = [f"tableau représentant {mot}" for mot in vocabulaire]
+        textes = [template.format(mot) for mot in vocabulaire for template in CLIP_TEMPLATES]
 
         regions_finales: list[RegionFinale] = []
         crops_originaux: list[Image.Image] = []
         boites_carrees: list[list[int]] = []
 
         largeur, hauteur = image.size
-        for boite in boites_masquees:
-            carre = convertir_boite_en_carre(boite, largeur, hauteur)
+        for idx, boite in enumerate(boites_masquees):
+            etiquette_hint = normaliser_texte(etiquettes_dino[idx]) if idx < len(etiquettes_dino) else ""
+            est_face = contient_hint_visage(etiquette_hint)
+            pad = self.face_padding_ratio if est_face else self.padding_ratio
+            carre = convertir_boite_en_carre(boite, largeur, hauteur, padding_ratio=pad)
             boites_carrees.append(carre)
             x1, y1, x2, y2 = carre
             crop = image.crop((x1, y1, x2, y2)).convert("RGB")
@@ -294,7 +370,8 @@ class PipelinePeyre:
             with torch.no_grad():
                 sorties = self.modele_clip(**entrees)
 
-            logits = sorties.logits_per_image
+            logits = sorties.logits_per_image.view(len(lot_crops), len(vocabulaire), len(CLIP_TEMPLATES))
+            logits = logits.mean(dim=2)
             probas = logits.softmax(dim=-1).detach().cpu().numpy()
 
             for j, vecteur in enumerate(probas):
@@ -330,11 +407,10 @@ class PipelinePeyre:
                 continue
             mots.add(t)
             for fragment in t.replace("_", " ").split():
-                if len(fragment) >= 3:
+                if len(fragment) >= 3 and fragment.isalpha():
                     mots.add(fragment)
 
-        # Ajout de classes génériques utiles dans les tableaux figuratifs.
-        mots.update(["silhouette", "portrait", "scene", "ornemental", "nature", "abstrait"])
+        mots.update(["nature", "landscape", "still life", "body", "architecture"])
 
         return sorted(mots)
 
@@ -359,6 +435,10 @@ def normaliser_texte(texte: str) -> str:
     return t
 
 
+def contient_hint_visage(texte: str) -> bool:
+    return any(mot in texte for mot in FACE_HINTS)
+
+
 def construire_etiquette_multi(vocabulaire: Sequence[str], scores: np.ndarray) -> str:
     idx_tries = np.argsort(scores)[::-1]
     meilleur = float(scores[idx_tries[0]])
@@ -374,11 +454,51 @@ def construire_etiquette_multi(vocabulaire: Sequence[str], scores: np.ndarray) -
     return "|".join(labels) if labels else vocabulaire[int(idx_tries[0])]
 
 
-def convertir_boite_en_carre(boite: Sequence[int | float], largeur: int, hauteur: int) -> list[int]:
+def iou_boites(a: Sequence[float], b: Sequence[float]) -> float:
+    ax1, ay1, ax2, ay2 = [float(v) for v in a]
+    bx1, by1, bx2, by2 = [float(v) for v in b]
+    inter_x1 = max(ax1, bx1)
+    inter_y1 = max(ay1, by1)
+    inter_x2 = min(ax2, bx2)
+    inter_y2 = min(ay2, by2)
+    iw = max(0.0, inter_x2 - inter_x1)
+    ih = max(0.0, inter_y2 - inter_y1)
+    inter = iw * ih
+    if inter <= 0:
+        return 0.0
+    aire_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    aire_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+    union = aire_a + aire_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def fusionner_regions_nms(regions: Sequence[DetectionRegion], iou_thresh: float) -> list[DetectionRegion]:
+    if not regions:
+        return []
+
+    triees = sorted(regions, key=lambda r: r.score_detection, reverse=True)
+    retenues: list[DetectionRegion] = []
+    for region in triees:
+        garder = True
+        for ref in retenues:
+            if iou_boites(region.boite, ref.boite) > iou_thresh:
+                garder = False
+                break
+        if garder:
+            retenues.append(region)
+    return retenues
+
+
+def convertir_boite_en_carre(
+    boite: Sequence[int | float],
+    largeur: int,
+    hauteur: int,
+    padding_ratio: float = 0.0,
+) -> list[int]:
     x1, y1, x2, y2 = [float(v) for v in boite]
     w = max(1.0, x2 - x1)
     h = max(1.0, y2 - y1)
-    cote = max(w, h)
+    cote = max(w, h) * (1.0 + max(0.0, padding_ratio))
 
     cx = (x1 + x2) / 2.0
     cy = (y1 + y2) / 2.0
@@ -525,8 +645,16 @@ def parser_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42, help="Seed déterministe")
     parser.add_argument("--box_threshold", type=float, default=0.22, help="Seuil Grounding DINO")
     parser.add_argument("--text_threshold", type=float, default=0.20, help="Seuil texte DINO")
+    parser.add_argument("--nms_iou", type=float, default=0.45, help="IoU NMS pour fusion des detections")
     parser.add_argument("--clip_threshold", type=float, default=0.20, help="Seuil CLIP")
     parser.add_argument("--crop_size", type=int, default=128, help="Taille de sortie des crops")
+    parser.add_argument("--crop_padding", type=float, default=0.10, help="Padding relatif des crops")
+    parser.add_argument(
+        "--face_crop_padding",
+        type=float,
+        default=0.28,
+        help="Padding relatif des crops visage/portrait",
+    )
     parser.add_argument("--clip_batch_size", type=int, default=8, help="Lot CLIP par image")
     parser.add_argument(
         "--grounding_model_id",
@@ -592,12 +720,19 @@ def main() -> None:
         len(images),
     )
     logging.info(
-        "Seuils -> DINO boite: %.2f | DINO texte: %.2f | CLIP: %.2f",
+        "Seuils -> DINO boite: %.2f | DINO texte: %.2f | NMS IoU: %.2f | CLIP: %.2f",
         args.box_threshold,
         args.text_threshold,
+        args.nms_iou,
         args.clip_threshold,
     )
-    logging.info("Taille crop: %dx%d", args.crop_size, args.crop_size)
+    logging.info(
+        "Taille crop: %dx%d | padding: %.2f | face padding: %.2f",
+        args.crop_size,
+        args.crop_size,
+        args.crop_padding,
+        args.face_crop_padding,
+    )
 
     pipeline = PipelinePeyre(
         appareil=appareil,
@@ -609,6 +744,9 @@ def main() -> None:
         modele_dino_id=args.grounding_model_id,
         modele_sam_id=args.sam_model_id,
         modele_clip_id=args.clip_model_id,
+        iou_nms=args.nms_iou,
+        padding_ratio=args.crop_padding,
+        face_padding_ratio=args.face_crop_padding,
     )
 
     lignes_csv: list[dict] = []
