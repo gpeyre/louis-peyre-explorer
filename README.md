@@ -165,6 +165,14 @@ Cas Google Colab:
 !pip install -q -r requirements-colab.txt
 ```
 
+- Si vous voyez `operator torchvision::nms does not exist`, forcez un couple cohérent `torch/torchvision/torchaudio`:
+
+```bash
+!pip uninstall -y torch torchvision torchaudio transformers accelerate || true
+!pip install -q --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0
+!pip install -q --no-cache-dir -r requirements-colab.txt
+```
+
 ## 10. Exécution sur Google Colab
 
 1. Ouvrir un notebook Colab.
@@ -178,10 +186,13 @@ drive.mount('/content/drive')
 
 ```bash
 %cd /content
+!rm -rf /content/louis-peyre-explorer
 !git clone https://github.com/gpeyre/louis-peyre-explorer.git
 %cd /content/louis-peyre-explorer
 !pip install -q --upgrade pip
-!pip install -q -r requirements-colab.txt
+!pip uninstall -y torch torchvision torchaudio transformers accelerate || true
+!pip install -q --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0
+!pip install -q --no-cache-dir -r requirements-colab.txt
 ```
 
 ```bash

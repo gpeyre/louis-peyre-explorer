@@ -4,8 +4,8 @@
 transformers==4.46.3
 accelerate==0.34.2
 
-# Pins pour rester compatibles avec les paquets préinstallés Colab.
-# On NE réinstalle pas torch/torchvision/torchaudio ici: Colab les fournit.
+# Pins pour rester compatibles avec l'écosystème Colab.
+# torch/torchvision/torchaudio sont installés explicitement dans le notebook Colab.
 pandas==2.2.2
 pillow>=10.0.0,<12.0.0
 fsspec==2025.3.0
