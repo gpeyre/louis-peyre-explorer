@@ -179,17 +179,32 @@ class PipelinePeyre:
         with torch.no_grad():
             sorties = self.modele_dino(**entrees)
 
-        resultats = self.proc_dino.post_process_grounded_object_detection(
-            sorties,
-            entrees.input_ids,
-            box_threshold=self.seuil_boite,
-            text_threshold=self.seuil_texte,
-            target_sizes=[image.size[::-1]],
-        )[0]
+        # Compatibilité multi-versions transformers:
+        # - anciennes versions: box_threshold
+        # - versions récentes: threshold
+        try:
+            resultats = self.proc_dino.post_process_grounded_object_detection(
+                sorties,
+                entrees.input_ids,
+                box_threshold=self.seuil_boite,
+                text_threshold=self.seuil_texte,
+                target_sizes=[image.size[::-1]],
+            )[0]
+        except TypeError:
+            resultats = self.proc_dino.post_process_grounded_object_detection(
+                sorties,
+                entrees.input_ids,
+                threshold=self.seuil_boite,
+                text_threshold=self.seuil_texte,
+                target_sizes=[image.size[::-1]],
+            )[0]
 
         boites = resultats["boxes"].detach().cpu().tolist()
         scores = resultats["scores"].detach().cpu().tolist()
-        etiquettes = [str(e) for e in resultats["labels"]]
+        etiquettes_brutes = resultats.get("labels")
+        if etiquettes_brutes is None:
+            etiquettes_brutes = resultats.get("text_labels", [])
+        etiquettes = [str(e) for e in etiquettes_brutes]
 
         regions: list[DetectionRegion] = []
         for boite, score, etiquette in zip(boites, scores, etiquettes):

@@ -162,7 +162,7 @@ Cas Google Colab:
 - Sur Colab, utilisez `requirements-colab.txt` (prévu pour `numpy>=2`):
 
 ```bash
-!pip install -q -r requirements-colab.txt
+!pip install -q --force-reinstall -r requirements-colab.txt
 ```
 
 ## 10. Exécution sur Google Colab
@@ -181,7 +181,7 @@ drive.mount('/content/drive')
 !git clone https://github.com/gpeyre/louis-peyre-explorer.git
 %cd /content/louis-peyre-explorer
 !pip install -q --upgrade pip
-!pip install -q -r requirements-colab.txt
+!pip install -q --force-reinstall -r requirements-colab.txt
 ```
 
 ```bash
@@ -200,4 +200,20 @@ Note mémoire Colab:
 
 ```bash
 !python pipeline.py --drive_folder louis-peyre-images --sam_model_id facebook/sam-vit-base --max_images 20
+```
+
+Messages fréquents en Colab:
+- `CLIPModel LOAD REPORT ... UNEXPECTED ... position_ids`
+  - Ce message est généralement non bloquant dans ce pipeline. Le chargement CLIP peut continuer normalement.
+- `GroundingDinoProcessor.post_process_grounded_object_detection() got an unexpected keyword argument 'box_threshold'`
+  - Ce problème venait d'une différence d'API `transformers` entre versions.
+  - Le script est maintenant compatible avec `box_threshold` et `threshold`.
+  - Si vous voyez encore cette erreur, assurez-vous d'avoir la dernière version du repo dans Colab:
+
+```bash
+%cd /content
+!rm -rf /content/louis-peyre-explorer
+!git clone https://github.com/gpeyre/louis-peyre-explorer.git
+%cd /content/louis-peyre-explorer
+!pip install -q --force-reinstall -r requirements-colab.txt
 ```
