@@ -162,7 +162,7 @@ Cas Google Colab:
 - Sur Colab, utilisez `requirements-colab.txt` (prévu pour `numpy>=2`):
 
 ```bash
-!pip install -q --force-reinstall -r requirements-colab.txt
+!pip install -q -r requirements-colab.txt
 ```
 
 ## 10. Exécution sur Google Colab
@@ -181,7 +181,7 @@ drive.mount('/content/drive')
 !git clone https://github.com/gpeyre/louis-peyre-explorer.git
 %cd /content/louis-peyre-explorer
 !pip install -q --upgrade pip
-!pip install -q --force-reinstall -r requirements-colab.txt
+!pip install -q -r requirements-colab.txt
 ```
 
 ```bash
@@ -215,5 +215,5 @@ Messages fréquents en Colab:
 !rm -rf /content/louis-peyre-explorer
 !git clone https://github.com/gpeyre/louis-peyre-explorer.git
 %cd /content/louis-peyre-explorer
-!pip install -q --force-reinstall -r requirements-colab.txt
+!pip install -q -r requirements-colab.txt
 ```
